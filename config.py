@@ -57,8 +57,9 @@ __C.CLS.pretrained = ''  # path to pretrained model
 __C.CLS.cosine_lr = False  # using cosine learning rate
 __C.CLS.validate = True  # validate
 __C.CLS.evaluate = False  # evaluate
-__C.CLS.drop_prob = 0.  # evaluate
-__C.CLS.block_size = 5  # evaluate
+__C.CLS.drop_prob = 0. # drop probability
+__C.CLS.block_size = 5 # dropblock size
+__C.CLS.nr_steps = 5000 # drop probability linear rate
 
 def _merge_a_into_b(a, b):
     """Merge config dictionary a into config dictionary b, clobbering the
@@ -69,7 +70,7 @@ def _merge_a_into_b(a, b):
 
     for k, v in a.items():
         # a must specify keys that are in b
-        if not k in b:
+        if k not in b:
             raise KeyError('{} is not a valid config key'.format(k))
 
         # the types must match, too
