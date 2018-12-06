@@ -266,10 +266,7 @@ def main():
     # Create model
     model = models.__dict__[cfg.CLS.arch](drop_prob,block_size)
     print(model)
-    # Calculate FLOPs & Param
-    n_flops, n_convops, n_params = measure_model(model, cfg.CLS.crop_size, cfg.CLS.crop_size)
-    print('==> FLOPs: {:.4f}M, Conv_FLOPs: {:.4f}M, Params: {:.4f}M'.
-          format(n_flops / 1e6, n_convops / 1e6, n_params / 1e6))
+    
     del model
     model = models.__dict__[cfg.CLS.arch](drop_prob,block_size)
 
