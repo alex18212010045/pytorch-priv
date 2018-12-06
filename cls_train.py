@@ -22,6 +22,7 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
 import models.imagenet as customized_models
+from tensorboardX import SummaryWriter
 
 try:
     import accimage
@@ -220,9 +221,12 @@ def adjust_learning_rate(optimizer, epoch, batch=0, batch_per_epoch=5000):
 
 
 def main():
+    writer = SummaryWriter('/workspace/mnt/group/ocr-fd-group/yangmingzhao/2018.11.27transblock/transdrop_resnet50_1x64d')
     global BEST_ACC, LR_STATE
     start_epoch = cfg.CLS.start_epoch  # start from epoch 0 or last checkpoint epoch
 
+    drop_prob=cfg.CLS.drop_prob
+    block_size=cfg.CLS.block_size
     # Create ckpt folder
     if not os.path.isdir(cfg.CLS.ckpt):
         mkdir_p(cfg.CLS.ckpt)
@@ -260,14 +264,14 @@ def main():
             num_workers=cfg.workers, pin_memory=True)
 
     # Create model
-    model = models.__dict__[cfg.CLS.arch]()
+    model = models.__dict__[cfg.CLS.arch](drop_prob,block_size)
     print(model)
     # Calculate FLOPs & Param
     n_flops, n_convops, n_params = measure_model(model, cfg.CLS.crop_size, cfg.CLS.crop_size)
     print('==> FLOPs: {:.4f}M, Conv_FLOPs: {:.4f}M, Params: {:.4f}M'.
           format(n_flops / 1e6, n_convops / 1e6, n_params / 1e6))
     del model
-    model = models.__dict__[cfg.CLS.arch]()
+    model = models.__dict__[cfg.CLS.arch](drop_prob,block_size)
 
     # Load pre-train model
     if cfg.CLS.pretrained:
@@ -332,7 +336,13 @@ def main():
             test_loss, test_top1, test_top5 = test(val_loader, model, criterion, epoch, USE_CUDA)
         else:
             test_loss, test_top1, test_top5 = 0.0, 0.0, 0.0
-
+        writer.add_scalar('train_loss', train_loss, epoch)
+        writer.add_scalar('train_acc', train_acc, epoch)
+        writer.add_scalar('test_loss', test_loss, epoch)
+        writer.add_scalar('test_top1', test_top1, epoch)
+        writer.add_scalar('test_top5', test_top5, epoch)
+        writer.add_scalar('LR_STATE', LR_STATE, epoch)
+        
         # Append logger file
         logger.append([LR_STATE, train_loss, test_loss, train_acc, test_top1])
         # Save model

@@ -57,7 +57,8 @@ __C.CLS.pretrained = ''  # path to pretrained model
 __C.CLS.cosine_lr = False  # using cosine learning rate
 __C.CLS.validate = True  # validate
 __C.CLS.evaluate = False  # evaluate
-
+__C.CLS.drop_prob = 0.  # evaluate
+__C.CLS.block_size = 5  # evaluate
 
 def _merge_a_into_b(a, b):
     """Merge config dictionary a into config dictionary b, clobbering the
@@ -66,9 +67,9 @@ def _merge_a_into_b(a, b):
     if type(a) is not edict:
         return
 
-    for k, v in a.iteritems():
+    for k, v in a.items():
         # a must specify keys that are in b
-        if not b.has_key(k):
+        if not k in b:
             raise KeyError('{} is not a valid config key'.format(k))
 
         # the types must match, too
