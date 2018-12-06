@@ -29,7 +29,9 @@ class DropBlock2D(nn.Module):
     def __init__(self, drop_prob, block_size):
         super(DropBlock2D, self).__init__()
 
-        self.drop_prob = drop_prob
+        # modified by Riheng 2018/12/06
+        # self.drop_prob = drop_prob
+        self.register_buffer('drop_prob', torch.FloatTensor([drop_prob]))
         self.block_size = block_size
 
     def forward(self, x):
@@ -38,7 +40,7 @@ class DropBlock2D(nn.Module):
         assert x.dim() == 4, \
             "Expected input with 4 dimensions (bsize, channels, height, width)"
 
-        if not self.training or self.drop_prob == 0.:
+        if not self.training or self.drop_prob[0] == 0.:
             return x
         else:
             # sample from a mask
@@ -55,7 +57,9 @@ class DropBlock2D(nn.Module):
             gamma = self._compute_gamma(x, mask_sizes)
 
             # sample mask
-            mask = Bernoulli(gamma).sample((x.shape[0], *mask_sizes))
+            # modified by Riheng 2018/12/06
+            #mask = Bernoulli(gamma).sample((x.shape[0], *mask_sizes))  # *mask_sizes for python3
+            mask = Bernoulli(gamma).sample((x.shape[0], mask_height, mask_width)) # can not run in torch0.3.1
 
             # place mask on input device
             mask = mask.to(x.device)
@@ -90,7 +94,8 @@ class DropBlock2D(nn.Module):
         if width_to_crop != 0:
             block_mask = block_mask[:, :, :, :-width_to_crop]
 
-        block_mask = (block_mask >= 1).to(device=block_mask.device, dtype=block_mask.dtype)
+        block_mask = (block_mask >= 1).to(
+            device=block_mask.device, dtype=block_mask.dtype)
         block_mask = 1 - block_mask.squeeze(1)
 
         return block_mask
@@ -98,7 +103,7 @@ class DropBlock2D(nn.Module):
     def _compute_gamma(self, x, mask_sizes):
         feat_area = x.shape[-2] * x.shape[-1]
         mask_area = mask_sizes[-2] * mask_sizes[-1]
-        return (self.drop_prob / (self.block_size ** 2)) * (feat_area / mask_area)
+        return (self.drop_prob[0] / (self.block_size ** 2)) * (feat_area / mask_area)
 
 
 class DropBlock3D(DropBlock2D):
@@ -148,7 +153,10 @@ class DropBlock3D(DropBlock2D):
             gamma = self._compute_gamma(x, mask_sizes)
 
             # sample mask
-            mask = Bernoulli(gamma).sample((x.shape[0], *mask_sizes))
+            # modified by Riheng 2018/12/06
+            # mask = Bernoulli(gamma).sample((x.shape[0], *mask_sizes))  # *mask_sizes for python3
+            mask = Bernoulli(gamma).sample(
+                (x.shape[0], mask_height, mask_width))  # can not run in torch0.3.1
 
             # place mask on input device
             mask = mask.to(x.device)
@@ -188,7 +196,8 @@ class DropBlock3D(DropBlock2D):
         if width_to_crop != 0:
             block_mask = block_mask[:, :, :, :, :-width_to_crop]
 
-        block_mask = (block_mask >= 1).to(device=block_mask.device, dtype=block_mask.dtype)
+        block_mask = (block_mask >= 1).to(
+            device=block_mask.device, dtype=block_mask.dtype)
         block_mask = 1 - block_mask.squeeze(1)
 
         return block_mask

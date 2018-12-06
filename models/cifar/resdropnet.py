@@ -10,8 +10,14 @@ https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py
 import torch.nn as nn
 import math
 
+import os, sys
+lib_path = os.path.abspath(os.path.join('..'))
+sys.path.append(lib_path)
 
-__all__ = ['resnet20','resnet32','resnet44','resnet56','resnet110','resnet1202']
+from ..dropblock.dropblock import DropBlock2D
+from ..dropblock.scheduler import LinearScheduler
+
+__all__ = ['resdropnet20','resdropnet32','resdropnet44','resdropnet56','resdropnet110','resdropnet1202']
 
 class ChannelPool(nn.Module):
     def __init__(self, kernel_size, stride, dilation=1, padding=0, pool_type='Max'):
@@ -77,7 +83,7 @@ class Bottleneck(nn.Module):
             pool_stride = inplanes / planes
             pool_kernel = pool_stride + 2
             pool_padding = 1
-            self.cp = ChannelPool(pool_kernel, stride=pool_stride, padding=pool_padding, pool_type='Max') 
+            self.cp = ChannelPool(pool_kernel, stride=pool_stride, padding=pool_padding, pool_type='Max')
         else:
             self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
@@ -116,10 +122,10 @@ class Bottleneck(nn.Module):
         return out
 
 
-class CifarResNet(nn.Module):
+class CifarResDropNet(nn.Module):
 
-    def __init__(self, depth, num_classes=1000):
-        super(CifarResNet, self).__init__()
+    def __init__(self, depth, num_classes=1000, drop_prob=0., block_size=5, nr_steps=5e3):
+        super(CifarResDropNet, self).__init__()
         # Model type specifies number of layers for CIFAR-10 model
         assert (depth - 2) % 6 == 0, 'depth should be 6n+2'
         n = (depth - 2) / 6
@@ -131,6 +137,14 @@ class CifarResNet(nn.Module):
                                bias=False)
         self.bn1 = nn.BatchNorm2d(16)
         self.relu = nn.ReLU(inplace=True)
+
+        self.dropblock = LinearScheduler(
+            DropBlock2D(drop_prob=drop_prob, block_size=block_size),
+            start_value=0.,
+            stop_value=drop_prob,
+            nr_steps=nr_steps  # 5e3
+        )
+
         self.layer1 = self._make_layer(block, 16, n)
         self.layer2 = self._make_layer(block, 32, n, stride=2)
         self.layer3 = self._make_layer(block, 64, n, stride=2)
@@ -163,13 +177,17 @@ class CifarResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
+        self.dropblock.step()  # increment number of iterations
+
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)    # 32x32
 
         x = self.layer1(x)  # 32x32
         x = self.layer2(x)  # 16x16
-        x = self.layer3(x)  # 8x8
+
+        # x = self.layer3(x)  # 8x8
+        x = self.dropblock(self.layer3(x))
 
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
@@ -178,32 +196,32 @@ class CifarResNet(nn.Module):
         return x
 
 
-def resnet(**kwargs):
+def resdropnet(**kwargs):
     """
     Constructs a ResNet model.
     """
-    return CifarResNet(**kwargs)
+    return CifarResDropNet(**kwargs)
 
-def resnet20():
-    model = CifarResNet(depth = 20, num_classes=10)
+def resdropnet20(drop_prob=0., block_size=5, nr_steps=5e3):
+    model = CifarResDropNet(depth = 20, num_classes=10, drop_prob=drop_prob, block_size=block_size, nr_steps=nr_steps)
     return model
 
-def resnet32():
-    model = CifarResNet(depth = 32, num_classes=10)
+def resdropnet32(drop_prob=0., block_size=5, nr_steps=5e3):
+    model = CifarResDropNet(depth = 32, num_classes=10, drop_prob=drop_prob, block_size=block_size, nr_steps=nr_steps)
     return model
 
-def resnet44():
-    model = CifarResNet(depth = 44, num_classes=10)
+def resdropnet44(drop_prob=0., block_size=5, nr_steps=5e3):
+    model = CifarResDropNet(depth = 44, num_classes=10, drop_prob=drop_prob, block_size=block_size, nr_steps=nr_steps)
     return model
 
-def resnet56():
-    model = CifarResNet(depth = 56, num_classes=10)
+def resdropnet56(drop_prob=0., block_size=5, nr_steps=5e3):
+    model = CifarResDropNet(depth = 56, num_classes=10, drop_prob=drop_prob, block_size=block_size, nr_steps=nr_steps)
     return model
 
-def resnet110():
-    model = CifarResNet(depth = 110, num_classes=10)
+def resdropnet110(drop_prob=0., block_size=5, nr_steps=5e3):
+    model = CifarResDropNet(depth = 110, num_classes=10, drop_prob=drop_prob, block_size=block_size, nr_steps=nr_steps)
     return model
 
-def resnet1202():
-    model = CifarResNet(depth = 1202, num_classes=10)
+def resdropnet1202(drop_prob=0., block_size=5, nr_steps=5e3):
+    model = CifarResDropNet(depth = 1202, num_classes=10, drop_prob=drop_prob, block_size=block_size, nr_steps=nr_steps)
     return model
