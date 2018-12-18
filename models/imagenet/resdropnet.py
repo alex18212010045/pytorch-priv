@@ -102,7 +102,7 @@ class ImageNetResNet(nn.Module):
             layers: config of layers, e.g., (3, 4, 23, 3)
             num_classes: number of classes
         """
-        super(ResNet, self).__init__()
+        super(ImageNetResNet, self).__init__()
         if bottleneck:
             block = Bottleneck
         else:
