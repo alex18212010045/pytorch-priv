@@ -1,30 +1,31 @@
-from __future__ import division
+from __future__ import absolute_import
 
-"""
-Creates a ResNet Model as defined in:
-Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun. (2015). 
-Deep Residual Learning for Image Recognition. 
-arXiv preprint arXiv:1512.03385.
-import from https://github.com/facebook/fb.resnet.torch
-Copyright (c) Yang Lu, 2017
-"""
-import numpy as np
-import math
+'''Resnet for cifar dataset. 
+Ported form 
+https://github.com/facebook/fb.resnet.torch
+and
+https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py
+(c) YANG, Wei 
+'''
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.nn import init
-import torch
-from torch.distributions import Bernoulli
-import torchvision
-from torch.autograd import Variable
+import math
 
-__all__ = ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152', 'resnet10_1x64d',
-           'resnet18_1x64d', 'resnet50_1x64d', 'resnet101_1x64d']
+import os, sys
+lib_path = os.path.abspath(os.path.join('..'))
+sys.path.append(lib_path)
+
+from ..dropblock.dropblock import DropBlock2D
+from ..dropblock.scheduler import LinearScheduler
+
+__all__ = ['resdropnet18', 'resdropnet34', 'resdropnet50', 'resdropnet101', 'resdropnet152', 'resdropnet10_1x64d',
+           'resdropnet18_1x64d', 'resdropnet50_1x64d', 'resdropnet101_1x64d']
+
 
 def conv3x3(in_planes, out_planes, stride=1):
-    """3x3 convolution with padding"""
+    "3x3 convolution with padding"
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=1, bias=False)
+
 
 
 class BasicBlock(nn.Module):
@@ -93,10 +94,9 @@ class Bottleneck(nn.Module):
         out = self.relu(out)
 
         return out
-
-
-class ResNet(nn.Module):
-    def __init__(self, bottleneck=False, baseWidth=64, head7x7=True, layers=(3, 4, 23, 3), num_classes=1000):
+    
+class ImageNetResNet(nn.Module):
+    def __init__(self, bottleneck=False, baseWidth=64, head7x7=True, layers=(3, 4, 23, 3), drop_prob=0., block_size=5, num_classes=1000,nr_steps=5e3):
         """ Constructor
         Args:
             layers: config of layers, e.g., (3, 4, 23, 3)
@@ -122,7 +122,12 @@ class ResNet(nn.Module):
             self.bn3 = nn.BatchNorm2d(baseWidth)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-
+        self.dropblock = LinearScheduler(
+            DropBlock2D(drop_prob=drop_prob, block_size=block_size),
+            start_value=0.,
+            stop_value=drop_prob,
+            nr_steps=nr_steps  # 5e3
+        )
         self.layer1 = self._make_layer(block, baseWidth, layers[0])
         self.layer2 = self._make_layer(block, baseWidth * 2, layers[1], 2)
         self.layer3 = self._make_layer(block, baseWidth * 4, layers[2], 2)
@@ -164,6 +169,7 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
+        self.dropblock.step()
         if self.head7x7:
             x = self.conv1(x)
             x = self.bn1(x)
@@ -181,16 +187,14 @@ class ResNet(nn.Module):
         x = self.maxpool(x)
         x = self.layer1(x)
         x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+        x = self.dropblock(self.layer3(x))
+        x = self.dropblock(self.layer4(x))
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
         x = self.fc(x)
 
         return x
-
-
-def resnet(bottleneck=True, baseWidth=64, head7x7=True, layers=(3, 4, 23, 3), num_classes=1000):
+def resdropnet(**kwargs):
     """
     Construct ResNet.
     (2, 2, 2, 2) for resnet18	# bottleneck=False
@@ -201,50 +205,50 @@ def resnet(bottleneck=True, baseWidth=64, head7x7=True, layers=(3, 4, 23, 3), nu
     (3, 8, 36, 3) for resnet152
     note: if you use head7x7=False, the actual depth of resnet will increase by 2 layers.
     """
-    model = ResNet(bottleneck=bottleneck, baseWidth=baseWidth, head7x7=head7x7, layers=layers, num_classes=num_classes)
+    model = ImageNetResNet(**kwargs)
     return model
 
 
-def resnet18():
-    model = ResNet(bottleneck=False, baseWidth=64, head7x7=True, layers=(2, 2, 2, 2), num_classes=1000)
+def resdropnet18(drop_prob=0., block_size=5, nr_steps=5e3):
+    model = ImageNetResNet(bottleneck=False, baseWidth=64, head7x7=True, layers=(2, 2, 2, 2), drop_prob=0., block_size=5, nr_steps=5e3, num_classes=1000)
     return model
 
 
-def resnet34():
-    model = ResNet(bottleneck=False, baseWidth=64, head7x7=True, layers=(3, 4, 6, 3), num_classes=1000)
+def resdropnet34(drop_prob=0., block_size=5, nr_steps=5e3):
+    model = ImageNetResNet(bottleneck=False, baseWidth=64, head7x7=True, layers=(3, 4, 6, 3), num_classes=1000)
     return model
 
 
-def resnet50():
-    model = ResNet(bottleneck=True, baseWidth=64, head7x7=True, layers=(3, 4, 6, 3), num_classes=1000)
+def resdropnet50(drop_prob=0., block_size=5, nr_steps=5e3):
+    model = ImageNetResNet(bottleneck=True, baseWidth=64, head7x7=True, layers=(3, 4, 6, 3), drop_prob=0., block_size=5, nr_steps=5e3, num_classes=1000)
     return model
 
 
-def resnet101():
-    model = ResNet(bottleneck=True, baseWidth=64, head7x7=True, layers=(3, 4, 23, 3), num_classes=1000)
+def resdropnet101(drop_prob=0., block_size=5, nr_steps=5e3):
+    model = ImageNetResNet(bottleneck=True, baseWidth=64, head7x7=True, layers=(3, 4, 23, 3), drop_prob=0., block_size=5, nr_steps=5e3, num_classes=1000)
     return model
 
 
-def resnet152():
-    model = ResNet(bottleneck=True, baseWidth=64, head7x7=True, layers=(3, 8, 36, 3), num_classes=1000)
+def resdropnet152(drop_prob=0., block_size=5, nr_steps=5e3):
+    model = ImageNetResNet(bottleneck=True, baseWidth=64, head7x7=True, layers=(3, 8, 36, 3), drop_prob=0., block_size=5, nr_steps=5e3, num_classes=1000)
     return model
 
 
-def resnet10_1x64d():
-    model = ResNet(bottleneck=False, baseWidth=64, head7x7=False, layers=(1, 1, 1, 1), num_classes=1000)
+def resdropnet10_1x64d(drop_prob=0., block_size=5, nr_steps=5e3):
+    model = ImageNetResNet(bottleneck=False, baseWidth=64, head7x7=False, layers=(1, 1, 1, 1), drop_prob=0., block_size=5, nr_steps=5e3, num_classes=1000)
     return model
 
 
-def resnet18_1x64d():
-    model = ResNet(bottleneck=False, baseWidth=64, head7x7=False, layers=(2, 2, 2, 2), num_classes=1000)
+def resdropnet18_1x64d(drop_prob=0., block_size=5, nr_steps=5e3):
+    model = ImageNetResNet(bottleneck=False, baseWidth=64, head7x7=False, layers=(2, 2, 2, 2), drop_prob=0., block_size=5, nr_steps=5e3, num_classes=1000)
     return model
 
 
-def resnet50_1x64d():
-    model = ResNet(bottleneck=True, baseWidth=64, head7x7=False, layers=(3, 4, 6, 3), num_classes=1000)
+def resdropnet50_1x64d(drop_prob=0., block_size=5, nr_steps=5e3):
+    model = ImageNetResNet(bottleneck=True, baseWidth=64, head7x7=False, layers=(3, 4, 6, 3), drop_prob=0., block_size=5, nr_steps=5e3, num_classes=1000)
     return model
 
 
-def resnet101_1x64d():
-    model = ResNet(bottleneck=True, baseWidth=64, head7x7=False, layers=(3, 4, 23, 3), num_classes=1000)
+def resdropnet101_1x64d(drop_prob=0., block_size=5, nr_steps=5e3):
+    model = ImageNetResNet(bottleneck=True, baseWidth=64, head7x7=False, layers=(3, 4, 23, 3), drop_prob=0., block_size=5, nr_steps=5e3, num_classes=1000)
     return model
