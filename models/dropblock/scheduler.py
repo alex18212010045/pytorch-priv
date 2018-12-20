@@ -23,3 +23,25 @@ class LinearScheduler(nn.Module):
             self.dropblock.drop_prob[0] = self.drop_values[self.i[0]]
             #print('{}: {:.6f}'.format(self.i.data[0], self.dropblock.drop_prob))
         self.i.add_(1)
+
+        
+class LineartransScheduler(nn.Module):
+    def __init__(self, transblock, start_value, stop_value, nr_steps):
+        super(LineartransScheduler, self).__init__()
+        self.transblock = transblock
+        # Modified by Riheng
+        # self.i = 0
+        self.register_buffer('i', torch.IntTensor([1]))
+        self.drop_values = np.linspace(
+            start=start_value, stop=stop_value, num=nr_steps)
+        # self.drop_values = torch.from_numpy(np.linspace(start=start_value, stop=stop_value, num=nr_steps))
+
+    def forward(self, x):
+        return self.transblock(x)
+
+    def step(self):
+        if self.i[0] < len(self.drop_values):
+            # if self.i.data[0] < self.drop_values.shape[0]:
+            self.transblock.drop_prob[0] = self.drop_values[self.i[0]]
+            #print('{}: {:.6f}'.format(self.i.data[0], self.dropblock.drop_prob))
+        self.i.add_(1)

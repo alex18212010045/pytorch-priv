@@ -4,8 +4,8 @@ pixel_std: [0.229, 0.224, 0.225]
 gpu_ids: '0,1'
 
 CLS:
-  arch: 'resnet50_1x64d'
-  data_root: '/workspace/mnt/group/terror/yangmingzhao/2018.12.6githubissues/tiny-imagenet-200/'
+  arch: 'resdropnet50_1x64d'
+  data_root: '/workspace/mnt/group/ocr-fd-group/yangmingzhao/terror/yangmingzhao/2018.12.6githubissues/tiny-imagenet-200/'
   train_folder: 'train'
   val_folder: 'val'
   epochs: 100
@@ -24,7 +24,7 @@ CLS:
   pixel_jitter: [-20, 20]
   grayscale: 0
   disp_iter: 20
-  ckpt: '/workspace/mnt/group/ocr-fd-group/yangmingzhao/2018.12.6githubissues/pytorch-priv/ckpts/test/'
+  ckpt: '/workspace/mnt/group/ocr-fd-group/2018.12.18dropblock/pytorch-priv/ckpts/test/'
   resume: ''
   start_epoch: 0
   pretrained: ''

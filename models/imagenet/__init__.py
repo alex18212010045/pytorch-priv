@@ -14,3 +14,4 @@ from .se_resnet import *
 from .se_resnext import *
 from .se_shufflenet import *
 from .resdropnet import *
+from .restransnet import *

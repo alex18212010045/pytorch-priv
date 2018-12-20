@@ -1,7 +1,6 @@
-cd /workspace/mnt/group/terror/yangmingzhao/2018.12.6githubissues/pytorch-priv/
-pip install --index https://pypi.mirrors.ustc.edu.cn/simple/ --upgrade pip
-pip install --index https://pypi.mirrors.ustc.edu.cn/simple/ easydict
-pip install --index https://pypi.mirrors.ustc.edu.cn/simple/ pyyaml
-pip install dropblock
+cd /workspace/mnt/group/ocr-fd-group/yangmingzhao/2018.12.18dropblock/pytorch-priv/
+pip2 install --index https://pypi.mirrors.ustc.edu.cn/simple/ --upgrade pip
+pip2 install --index https://pypi.mirrors.ustc.edu.cn/simple/ easydict
+pip2 install --index https://pypi.mirrors.ustc.edu.cn/simple/ pyyaml
 pip install tensorboardX
-python3 cls_train.py --cfg cfgs/imagenet/resnet50_1x64d.yml
+python2 tools/cls_transblock_imagenet.py --cfg cfgs/imagenet/restransnet50_1x64d.yml
