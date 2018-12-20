@@ -16,7 +16,7 @@ sys.path.append(lib_path)
 
 from ..dropblock.dropblock import DropBlock2D
 from ..dropblock.transblock import transBlocklayer3,transBlocklayer4
-from ..dropblock.scheduler import LineartransScheduler,LinearScheduler
+from ..dropblock.scheduler import LinearScheduler
 
 __all__ = ['restransnet18', 'restransnet34', 'restransnet50', 'restransnet101', 'restransnet152', 'restransnet10_1x64d',
            'restransnet18_1x64d', 'restransnet50_1x64d', 'restransnet101_1x64d']
@@ -143,18 +143,8 @@ class ImageNetRestransNet(nn.Module):
         self.layer4 = self._make_layer(block, baseWidth * 8, layers[3], 2)
         self.avgpool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Linear(baseWidth * 8 * block.expansion, num_classes)
-        self.transblocklayer3 = LineartransScheduler(
-            transBlocklayer3(drop_prob=drop_prob, block_size=block_size,premodel=premodel,layer3=self.layer3),
-            start_value=0.,
-            stop_value=drop_prob,
-            nr_steps=nr_steps  # 5e3
-        )
-        self.transblocklayer4 = LineartransScheduler(
-            transBlocklayer4(drop_prob=drop_prob, block_size=block_size,premodel=premodel,layer4=self.layer4),
-            start_value=0.,
-            stop_value=drop_prob,
-            nr_steps=nr_steps  # 5e3
-        )
+        self.transblocklayer3 = transBlocklayer3(drop_prob=drop_prob, block_size=block_size,premodel=premodel,layer3=self.layer3)
+        self.transblocklayer4 =transBlocklayer4(drop_prob=drop_prob, block_size=block_size,premodel=premodel,layer4=self.layer4)
         self.dropblock = LinearScheduler(
             DropBlock2D(drop_prob=drop_prob, block_size=block_size),
             start_value=0.,

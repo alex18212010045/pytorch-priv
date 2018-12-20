@@ -153,7 +153,9 @@ def train(loader, model, criterion, optimizer, epoch, use_cuda):
         losses.update(loss.data[0], inputs.size(0))
         top1.update(prec1[0], inputs.size(0))
         top5.update(prec5[0], inputs.size(0))
-        drop_prob = model.module.transblocklayer3.transblock.drop_prob[0]
+        drop_prob = model.module.transblocklayer3.drop_prob
+        print(model.module.transblocklayer3.drop_prob)
+        print(model.module.transblocklayer4.drop_prob)
         if (batch_idx + 1) % cfg.CLS.disp_iter == 0:
             print('Training: [{}/{}][{}/{}] | Best_Acc: {:4.2f}% | Time: {:.2f} | Data: {:.2f} | '
                   'LR: {:.8f} | Top1: {:.4f}% | Top5: {:.4f}% | Teacher Top1: {:.4f}% | Teacher Top5: {:.4f}% | Loss: {:.4f} | Total: {:.2f} | drop_prob: {:.5f}'

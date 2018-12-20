@@ -123,7 +123,7 @@ def train(loader, model, criterion, optimizer, epoch, use_cuda):
         top1.update(prec1[0], inputs.size(0))
         top5.update(prec5[0], inputs.size(0))
 
-        drop_prob = model.module.dropblock.dropblock.drop_prob[0]
+        drop_prob = model.module.dropblock.dropblock.drop_prob
 
         if (batch_idx + 1) % cfg.CLS.disp_iter == 0:
             print('Training: [{}/{}][{}/{}] | Best_Acc: {:4.2f}% | Time: {:.2f} | Data: {:.2f} | '

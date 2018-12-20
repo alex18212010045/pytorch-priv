@@ -27,38 +27,12 @@ class transBlocklayer3(nn.Module):
     def __init__(self, drop_prob, block_size, premodel,layer3):
         super(transBlocklayer3, self).__init__()
         # modified by Riheng 2018/12/06
-        # self.drop_prob = drop_prob
-        self.register_buffer('drop_prob', torch.FloatTensor([drop_prob]))
+        self.drop_prob = drop_prob
+        #self.register_buffer('drop_prob', torch.FloatTensor([drop_prob]))
         self.block_size = block_size
         self.premodel=premodel
         self.layer3 = layer3
 
-
-    
-    def _make_layer(self, block, planes, blocks, stride=1):
-        """ Stack n bottleneck modules where n is inferred from the depth of the network.
-        Args:
-            block: block type used to construct ResNet
-            planes: number of output channels (need to multiply by block.expansion)
-            blocks: number of blocks to be built
-            stride: factor to reduce the spatial dimensionality in the first bottleneck of the block.
-        Returns: a Module consisting of n sequential bottlenecks.
-        """
-        downsample = None
-        if stride != 1 or self.inplanes != planes * block.expansion:
-            downsample = nn.Sequential(
-                nn.Conv2d(self.inplanes, planes * block.expansion,
-                          kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(planes * block.expansion),
-            )
-
-        layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample))
-        self.inplanes = planes * block.expansion
-        for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes))
-
-        return nn.Sequential(*layers)
     
     def forward(self, x):
         # shape: (bsize, channels, height, width)
@@ -71,19 +45,9 @@ class transBlocklayer3(nn.Module):
         assert x.dim() == 4, \
             "Expected input with 4 dimensions (bsize, channels, height, width)"
 
-        if not self.training or self.drop_prob[0] == 0.:
+        if not self.training or self.drop_prob == 0.:
             return x
         else:
-            # sample from a mask
-            mask_reduction = self.block_size // 2
-            mask_height = x.shape[-2] - mask_reduction
-            mask_width = x.shape[-1] - mask_reduction
-            mask_sizes = [mask_height, mask_width]
-
-            if any([size <= 0 for size in mask_sizes]):
-                raise ValueError('Input of shape {} is too small for block_size {}'
-                                 .format(tuple(x.shape), self.block_size))
-
             # get gamma value
             gamma = self._compute_gamma(x)
 
@@ -122,34 +86,20 @@ class transBlocklayer3(nn.Module):
             return out
 
     def _compute_block_mask(self, mask):
-        block_mask = F.conv2d(mask[:, None, :, :],
-                              torch.ones((1, 1, self.block_size, self.block_size)).to(
-                                  mask.device),
-                              padding=int(np.ceil(self.block_size / 2) + 1))
+        block_mask = F.max_pool2d(input=mask[:, None, :, :],
+                                  kernel_size=(self.block_size, self.block_size),
+                                  stride=(1, 1),
+                                  padding=self.block_size // 2)
 
-        delta = self.block_size // 2
-        input_height = mask.shape[-2] + delta
-        input_width = mask.shape[-1] + delta
+        if self.block_size % 2 == 0:
+            block_mask = block_mask[:, :, :-1, :-1]
 
-        height_to_crop = block_mask.shape[-2] - input_height
-        width_to_crop = block_mask.shape[-1] - input_width
-
-        if height_to_crop != 0:
-            block_mask = block_mask[:, :, :-height_to_crop, :]
-
-        if width_to_crop != 0:
-            block_mask = block_mask[:, :, :, :-width_to_crop]
-
-        block_mask = (block_mask >= 1).to(
-            device=block_mask.device, dtype=block_mask.dtype)
         block_mask = 1 - block_mask.squeeze(1)
 
         return block_mask
 
-    def _compute_gamma(self, x, mask_sizes):
-        feat_area = x.shape[-2] * x.shape[-1]
-        mask_area = mask_sizes[-2] * mask_sizes[-1]
-        return (self.drop_prob[0] / (self.block_size ** 2)) * (feat_area / mask_area)
+    def _compute_gamma(self, x):
+        return self.drop_prob / (self.block_size ** 2)
 
 class transBlocklayer4(nn.Module):
     r"""Randomly zeroes 2D spatial blocks of the input tensor.
@@ -176,8 +126,8 @@ class transBlocklayer4(nn.Module):
         super(transBlocklayer4, self).__init__()
 
         # modified by Riheng 2018/12/06
-        # self.drop_prob = drop_prob
-        self.register_buffer('drop_prob', torch.FloatTensor([drop_prob]))
+        self.drop_prob = drop_prob
+        #self.register_buffer('drop_prob', torch.FloatTensor([drop_prob]))
         self.block_size = block_size
         self.premodel=premodel
         self.layer4=layer4
@@ -193,19 +143,9 @@ class transBlocklayer4(nn.Module):
         assert x.dim() == 4, \
             "Expected input with 4 dimensions (bsize, channels, height, width)"
 
-        if not self.training or self.drop_prob[0] == 0.:
+        if not self.training or self.drop_prob == 0.:
             return x
         else:
-            # sample from a mask
-            mask_reduction = self.block_size // 2
-            mask_height = x.shape[-2] - mask_reduction
-            mask_width = x.shape[-1] - mask_reduction
-            mask_sizes = [mask_height, mask_width]
-
-            if any([size <= 0 for size in mask_sizes]):
-                raise ValueError('Input of shape {} is too small for block_size {}'
-                                 .format(tuple(x.shape), self.block_size))
-
             # get gamma value
             gamma = self._compute_gamma(x)
 
@@ -244,31 +184,17 @@ class transBlocklayer4(nn.Module):
             return out
 
     def _compute_block_mask(self, mask):
-        block_mask = F.conv2d(mask[:, None, :, :],
-                              torch.ones((1, 1, self.block_size, self.block_size)).to(
-                                  mask.device),
-                              padding=int(np.ceil(self.block_size / 2) + 1))
+        block_mask = F.max_pool2d(input=mask[:, None, :, :],
+                                  kernel_size=(self.block_size, self.block_size),
+                                  stride=(1, 1),
+                                  padding=self.block_size // 2)
 
-        delta = self.block_size // 2
-        input_height = mask.shape[-2] + delta
-        input_width = mask.shape[-1] + delta
+        if self.block_size % 2 == 0:
+            block_mask = block_mask[:, :, :-1, :-1]
 
-        height_to_crop = block_mask.shape[-2] - input_height
-        width_to_crop = block_mask.shape[-1] - input_width
-
-        if height_to_crop != 0:
-            block_mask = block_mask[:, :, :-height_to_crop, :]
-
-        if width_to_crop != 0:
-            block_mask = block_mask[:, :, :, :-width_to_crop]
-
-        block_mask = (block_mask >= 1).to(
-            device=block_mask.device, dtype=block_mask.dtype)
         block_mask = 1 - block_mask.squeeze(1)
 
         return block_mask
 
-    def _compute_gamma(self, x, mask_sizes):
-        feat_area = x.shape[-2] * x.shape[-1]
-        mask_area = mask_sizes[-2] * mask_sizes[-1]
-        return (self.drop_prob[0] / (self.block_size ** 2)) * (feat_area / mask_area)
+    def _compute_gamma(self, x):
+        return self.drop_prob / (self.block_size ** 2)
