@@ -60,6 +60,7 @@ __C.CLS.evaluate = False  # evaluate
 __C.CLS.drop_prob = 0. # drop probability
 __C.CLS.block_size = 5 # dropblock size
 __C.CLS.nr_steps = 5000 # drop probability linear rate
+__C.CLS.label_smoothing = 0. # drop probability linear rate
 
 def _merge_a_into_b(a, b):
     """Merge config dictionary a into config dictionary b, clobbering the

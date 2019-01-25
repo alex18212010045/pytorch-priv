@@ -3,7 +3,9 @@ Image Classification training script
 Copyright (c) Yang Lu, 2017
 """
 from __future__ import print_function
-
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import inspect
 import os
 import sys
@@ -31,6 +33,8 @@ import torchvision.datasets as datasets
 import torchvision.models as models
 import models.imagenet as customized_models
 from tensorboardX import SummaryWriter
+from torch.nn.modules.loss import *
+from torch.nn.functional import *
 
 try:
     import accimage
@@ -72,7 +76,7 @@ if args.set_cfgs is not None:
     cfg_from_list(args.set_cfgs)
 print('==> Using config:')
 pprint.pprint(cfg)
-
+num_classes=cfg.CLS.num_classes
 # Use CUDA
 os.environ['CUDA_VISIBLE_DEVICES'] = cfg.gpu_ids
 USE_CUDA = torch.cuda.is_available()
@@ -86,9 +90,41 @@ if USE_CUDA:
 # Global param
 BEST_ACC = 0  # best test accuracy
 LR_STATE = cfg.CLS.base_lr
+# outputs:(batches,classes) 
+#targets:(batches)
+def sigmoid(x):
+    s = 1 / (1 + np.exp(-x))
+    return s
+
+def SoftmaxCrossEntropyLoss(pred,label,axis=-1,sparse_label=False,from_logits=False,weight=None):
+    if not from_logits:
+        logsoftmax = torch.nn.LogSoftmax(dim=axis)
+        pred=logsoftmax(pred)
+    if sparse_label or weight !=None:
+        raise NotImplementedError
+    else :
+        loss = - torch.sum(pred*label,dim=axis,keepdim=True)
+    return torch.mean(loss)
+
+    
+    return loss
+
+def one_hot(x, n):
+    """
+    convert index representation to one-hot representation
+    """
+    x = np.array(x)
+    assert x.ndim == 1
+    return np.eye(n)[x]
 
 
-def train(loader, model, criterion, optimizer, epoch, use_cuda):
+def label_smooth(target,label_smoothing):
+    one_hot_targets=one_hot(target,num_classes)
+    smoothed_labels=(1-label_smoothing)*one_hot_targets+label_smoothing/num_classes
+
+    return smoothed_labels
+
+def train(loader, model, optimizer, epoch,label_smoothing, use_cuda):
     global BEST_ACC, LR_STATE
     # switch to train mode
     if not cfg.CLS.fix_bn:
@@ -118,7 +154,14 @@ def train(loader, model, criterion, optimizer, epoch, use_cuda):
         outputs = model(inputs)
         # forward pass: compute gradient and do SGD step
         optimizer.zero_grad()
-        loss = criterion(outputs, targets)
+        
+        smooth_targets=label_smooth(targets,label_smoothing)
+        smooth_targets=torch.from_numpy(smooth_targets)
+        smooth_targets=smooth_targets.float().cuda()
+        
+        loss=SoftmaxCrossEntropyLoss(outputs, smooth_targets)
+
+        
         # backward
         loss.backward()
         optimizer.step()
@@ -141,7 +184,7 @@ def train(loader, model, criterion, optimizer, epoch, use_cuda):
     return (losses.avg, top1.avg)
 
 
-def test(val_loader, model, criterion, epoch, use_cuda):
+def test(val_loader, model, epoch,label_smoothing, use_cuda):
     global BEST_ACC, LR_STATE
 
     print('==> Evaluating at {} epochs...'.format(epoch + 1))
@@ -165,8 +208,13 @@ def test(val_loader, model, criterion, epoch, use_cuda):
 
         # forward pass: compute output
         outputs = model(inputs)
-        loss = criterion(outputs, targets)
-
+        
+        smooth_targets=label_smooth(targets,label_smoothing)
+        smooth_targets=torch.from_numpy(smooth_targets)
+        smooth_targets=smooth_targets.float().cuda()
+        
+        loss=SoftmaxCrossEntropyLoss(outputs, smooth_targets)
+        
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
@@ -232,7 +280,7 @@ def main():
     writer = SummaryWriter('/workspace/mnt/group/ocr-fd-group/yangmingzhao/2018.11.27transblock/transdrop_resnet50_1x64d')
     global BEST_ACC, LR_STATE
     start_epoch = cfg.CLS.start_epoch  # start from epoch 0 or last checkpoint epoch
-
+    label_smoothing=cfg.CLS.label_smoothing
     drop_prob=cfg.CLS.drop_prob
     block_size=cfg.CLS.block_size
     # Create ckpt folder
@@ -300,7 +348,7 @@ def main():
         print("==> Creating model '{}'".format(cfg.CLS.arch))
 
     # Define loss function (criterion) and optimizer
-    criterion = nn.CrossEntropyLoss().cuda()
+
     if cfg.CLS.pretrained:
         def param_filter(param):
             return param[1]
@@ -318,7 +366,7 @@ def main():
     # Evaluate model
     if cfg.CLS.evaluate:
         print('\n==> Evaluation only')
-        test_loss, test_top1, test_top5 = test(val_loader, model, criterion, start_epoch, USE_CUDA)
+        test_loss, test_top1, test_top5 = test(val_loader, model, start_epoch,label_smoothing, USE_CUDA)
         print('==> Test Loss: {:.8f} | Test_top1: {:.4f}% | Test_top5: {:.4f}%'.format(test_loss, test_top1, test_top5))
         return
 
@@ -342,9 +390,9 @@ def main():
     for epoch in range(start_epoch, cfg.CLS.epochs):
         print('\nEpoch: [{}/{}] | LR: {:.8f}'.format(epoch + 1, cfg.CLS.epochs, LR_STATE))
 
-        train_loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, USE_CUDA)
+        train_loss, train_acc = train(train_loader, model, optimizer, epoch,label_smoothing, USE_CUDA)
         if cfg.CLS.validate:
-            test_loss, test_top1, test_top5 = test(val_loader, model, criterion, epoch, USE_CUDA)
+            test_loss, test_top1, test_top5 = test(val_loader, model, epoch,label_smoothing, USE_CUDA)
         else:
             test_loss, test_top1, test_top5 = 0.0, 0.0, 0.0
         writer.add_scalar('train_loss', train_loss, epoch)

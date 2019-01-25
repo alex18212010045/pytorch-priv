@@ -1,0 +1,35 @@
+workers: 10
+pixel_mean: [0.485, 0.456, 0.406]
+pixel_std: [0.229, 0.224, 0.225]
+gpu_ids: '0,1'
+
+CLS:
+  arch: 'resdropnet50_1x64d'
+  data_root: '/workspace/mnt/group/general-reg/yangmingzhao/tiny-imagenet-200/'
+  train_folder: 'train'
+  val_folder: 'val'
+  epochs: 100
+  train_batch: 64
+  test_batch: 32
+  base_lr: 0.1
+  lr_schedule: [30, 60, 90]
+  gamma: 0.1
+  momentum: 0.9
+  weight_decay: 0.0001
+  fix_bn: False
+  num_classes: 1000
+  base_size: 256
+  crop_size: 224
+  rotation: [-10, 10]
+  pixel_jitter: [-20, 20]
+  grayscale: 0
+  disp_iter: 20
+  ckpt: '/workspace/mnt/group/general-reg/yangmingzhao/2019.1.3cifardrop/pytorch-priv/ckpts/label_smoothing_0'
+  resume: ''
+  start_epoch: 0
+  pretrained: ''
+  validate: True
+  evaluate: False
+  drop_prob: 0.2
+  block_size: 5
+  label_smoothing: 0.
